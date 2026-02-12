@@ -1,5 +1,8 @@
 package com.traderecon.forge.processor;
 
+import com.traderecon.forge.model.TradeRecord;
+import com.traderecon.forge.service.DatabaseService;
+import com.traderecon.forge.service.TradeMapper;
 import io.annapurna.model.CreditDefaultSwap;
 import io.annapurna.model.Trade;
 import io.annapurna.model.TradeType;
@@ -15,6 +18,8 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.temporal.ChronoUnit;
 
+
+
 /**
  * Processor for Credit Default Swap trades.
  */
@@ -24,11 +29,15 @@ public class CDSProcessor implements TradeProcessor {
 
     private final ValidationService validationService;
     private final EnrichmentService enrichmentService;
-
+    private final DatabaseService databaseService;
+    private final TradeMapper tradeMapper;
     @Autowired
-    public CDSProcessor(ValidationService validationService, EnrichmentService enrichmentService) {
+    public CDSProcessor(ValidationService validationService, EnrichmentService enrichmentService, DatabaseService databaseService,
+                        TradeMapper tradeMapper) {
         this.validationService = validationService;
         this.enrichmentService = enrichmentService;
+        this.databaseService = databaseService;
+        this.tradeMapper = tradeMapper;
     }
 
     @Override
@@ -60,6 +69,9 @@ public class CDSProcessor implements TradeProcessor {
             log.info("Processed CDS {}: ReferenceEntity={}, Spread={} bps, AnnualPremium={}, ProtectionValue={}, CDSValue={}",
                     cds.getTradeId(), cds.getReferenceEntity(), cds.getSpreadBps(),
                     annualPremium, protectionValue, cdsValue);
+            // Step 4: DB booking with rollback
+            TradeRecord record = tradeMapper.toRecord(cds);
+            databaseService.bookTradeWithRollback(record);
 
             ProcessingResult result = ProcessingResult.success(cds.getTradeId());
             result.setProcessingTimeMs(System.currentTimeMillis() - startTime);

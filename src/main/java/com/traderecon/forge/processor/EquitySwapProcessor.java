@@ -1,5 +1,8 @@
 package com.traderecon.forge.processor;
 
+import com.traderecon.forge.model.TradeRecord;
+import com.traderecon.forge.service.DatabaseService;
+import com.traderecon.forge.service.TradeMapper;
 import io.annapurna.model.EquitySwap;
 import io.annapurna.model.Trade;
 import io.annapurna.model.TradeType;
@@ -23,11 +26,14 @@ public class EquitySwapProcessor implements TradeProcessor {
 
     private final ValidationService validationService;
     private final EnrichmentService enrichmentService;
-
+    private final TradeMapper tradeMapper;
+    private final DatabaseService databaseService;
     @Autowired
-    public EquitySwapProcessor(ValidationService validationService, EnrichmentService enrichmentService) {
+    public EquitySwapProcessor(ValidationService validationService, EnrichmentService enrichmentService, TradeMapper tradeMapper, DatabaseService databaseService) {
         this.validationService = validationService;
         this.enrichmentService = enrichmentService;
+        this.databaseService  = databaseService;
+        this.tradeMapper = tradeMapper;
     }
 
     @Override
@@ -58,6 +64,10 @@ public class EquitySwapProcessor implements TradeProcessor {
 
             log.info("Processed Equity Swap {}: EquityLegValue={}, FundingLegValue={}, SwapValue={}",
                     swap.getTradeId(), equityLegValue, fundingLegValue, swapValue);
+
+            // Step 4: DB booking with rollback
+            TradeRecord record = tradeMapper.toRecord(swap);
+            databaseService.bookTradeWithRollback(record);
 
             ProcessingResult result = ProcessingResult.success(swap.getTradeId());
             result.setProcessingTimeMs(System.currentTimeMillis() - startTime);

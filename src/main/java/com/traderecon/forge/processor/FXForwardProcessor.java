@@ -1,5 +1,8 @@
 package com.traderecon.forge.processor;
 
+import com.traderecon.forge.model.TradeRecord;
+import com.traderecon.forge.service.DatabaseService;
+import com.traderecon.forge.service.TradeMapper;
 import io.annapurna.model.FXForward;
 import io.annapurna.model.Trade;
 import io.annapurna.model.TradeType;
@@ -24,11 +27,14 @@ public class FXForwardProcessor implements TradeProcessor {
 
     private final ValidationService validationService;
     private final EnrichmentService enrichmentService;
-
+    private final TradeMapper tradeMapper;
+    private final DatabaseService databaseService;
     @Autowired
-    public FXForwardProcessor(ValidationService validationService, EnrichmentService enrichmentService) {
+    public FXForwardProcessor(ValidationService validationService, EnrichmentService enrichmentService, TradeMapper tradeMapper,DatabaseService databaseService ) {
         this.validationService = validationService;
         this.enrichmentService = enrichmentService;
+        this.databaseService = databaseService;
+        this.tradeMapper = tradeMapper;
     }
 
     @Override
@@ -60,6 +66,10 @@ public class FXForwardProcessor implements TradeProcessor {
 
             log.info("Processed FX Forward {}: Spot={}, Forward={}, TheoreticalForward={}, MTM={}",
                     forward.getTradeId(), spotRate, forward.getForwardRate(), theoreticalForward, mtm);
+
+            // Step 4: DB booking with rollback
+            TradeRecord record = tradeMapper.toRecord(forward);
+            databaseService.bookTradeWithRollback(record);
 
             ProcessingResult result = ProcessingResult.success(forward.getTradeId());
             result.setProcessingTimeMs(System.currentTimeMillis() - startTime);

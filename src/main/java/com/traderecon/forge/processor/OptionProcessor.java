@@ -1,5 +1,8 @@
 package com.traderecon.forge.processor;
 
+import com.traderecon.forge.model.TradeRecord;
+import com.traderecon.forge.service.DatabaseService;
+import com.traderecon.forge.service.TradeMapper;
 import io.annapurna.model.EquityOption;
 import io.annapurna.model.Trade;
 import io.annapurna.model.TradeType;
@@ -24,11 +27,15 @@ public class OptionProcessor implements TradeProcessor {
 
     private final ValidationService validationService;
     private final EnrichmentService enrichmentService;
+    private final TradeMapper tradeMapper;
+    private final DatabaseService databaseService;
 
     @Autowired
-    public OptionProcessor(ValidationService validationService, EnrichmentService enrichmentService) {
+    public OptionProcessor(ValidationService validationService, EnrichmentService enrichmentService, DatabaseService databaseService, TradeMapper tradeMapper) {
         this.validationService = validationService;
         this.enrichmentService = enrichmentService;
+        this.tradeMapper = tradeMapper;
+        this.databaseService = databaseService;
     }
 
     @Override
@@ -61,6 +68,10 @@ public class OptionProcessor implements TradeProcessor {
             log.info("Processed Option {}: Type={}, Strike={}, Spot={}, Intrinsic={}, TimeValue={}, Delta={}",
                     option.getTradeId(), option.getOptionType(), option.getStrikePrice(),
                     currentPrice, intrinsicValue, timeValue, delta);
+
+            // Step 4: DB booking with rollback
+            TradeRecord record = tradeMapper.toRecord(option);
+            databaseService.bookTradeWithRollback(record);
 
             ProcessingResult result = ProcessingResult.success(option.getTradeId());
             result.setProcessingTimeMs(System.currentTimeMillis() - startTime);

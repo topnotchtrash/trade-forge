@@ -1,5 +1,7 @@
 package com.traderecon.forge.processor;
 
+import com.traderecon.forge.service.DatabaseService;
+import com.traderecon.forge.service.TradeMapper;
 import io.annapurna.model.InterestRateSwap;
 import io.annapurna.model.Trade;
 import io.annapurna.model.TradeType;
@@ -24,10 +26,16 @@ public class SwapProcessor implements TradeProcessor {
     private final ValidationService validationService;
     private final EnrichmentService enrichmentService;
 
+    private final DatabaseService databaseService;
+
+    private final TradeMapper tradeMapper;
+
     @Autowired
-    public SwapProcessor(ValidationService validationService, EnrichmentService enrichmentService) {
+    public SwapProcessor(ValidationService validationService, EnrichmentService enrichmentService, TradeMapper tradeMapper, DatabaseService databaseService ) {
         this.validationService = validationService;
         this.enrichmentService = enrichmentService;
+        this.tradeMapper = tradeMapper;
+        this.databaseService = databaseService;
     }
 
     @Override
@@ -63,6 +71,7 @@ public class SwapProcessor implements TradeProcessor {
 
             ProcessingResult result = ProcessingResult.success(swap.getTradeId());
             result.setProcessingTimeMs(System.currentTimeMillis() - startTime);
+
             return result;
 
         } catch (ValidationException e) {

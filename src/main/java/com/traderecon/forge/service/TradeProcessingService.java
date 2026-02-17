@@ -1,5 +1,6 @@
 package com.traderecon.forge.service;
 
+import com.traderecon.forge.metrics.ProcessingMetrics;
 import io.annapurna.model.Trade;
 import io.annapurna.model.TradeType;
 import com.traderecon.forge.model.ProcessingResult;
@@ -25,32 +26,31 @@ public class TradeProcessingService {
     private final List<TradeProcessor> processors;
     private final ExecutorService executorService;
     private final int timeoutSeconds;
+    private final ProcessingMetrics metrics;
 
     @Autowired
     public TradeProcessingService(
             List<TradeProcessor> processors,
             @Value("${processing.thread-pool-size:8}") int threadPoolSize,
-            @Value("${processing.timeout-seconds:30}") int timeoutSeconds
+            @Value("${processing.timeout-seconds:30}") int timeoutSeconds,
+            ProcessingMetrics metrics
     ) {
         this.processors = processors;
         this.timeoutSeconds = timeoutSeconds;
+        this.metrics = metrics;
         this.executorService = Executors.newFixedThreadPool(threadPoolSize);
-
-        log.info("TradeProcessingService initialized with {} processors and {} threads",
-                processors.size(), threadPoolSize);
     }
 
-    /**
-     * Process a trade through the complete workflow.
-     */
     public ProcessingResult process(Trade trade) {
         long startTime = System.currentTimeMillis();
 
+        // Track active processing
+        metrics.incrementActiveProcessing();
+        metrics.recordKafkaMessageConsumed();
+
         try {
-            // Find appropriate processor
             TradeProcessor processor = findProcessor(trade.getTradeType());
 
-            // Process asynchronously with timeout
             CompletableFuture<ProcessingResult> future = CompletableFuture.supplyAsync(
                     () -> processor.process(trade),
                     executorService
@@ -58,33 +58,53 @@ public class TradeProcessingService {
 
             ProcessingResult result = future.join();
 
-            // Update processing time
             long duration = System.currentTimeMillis() - startTime;
             result.setProcessingTimeMs(duration);
+
+            // Record metrics
+            metrics.recordProcessing(trade.getTradeType(), result.getStatus(), duration);
+
+            // Record validation failures separately
+            if (result.getStatus() == ProcessingStatus.VALIDATION_FAILED) {
+                metrics.recordValidationFailure(trade.getTradeType());
+            }
 
             return result;
 
         } catch (CompletionException e) {
-            log.error("Processing failed for trade: {}", trade.getTradeId(), e.getCause());
+            Throwable cause = e.getCause();
+            long duration = System.currentTimeMillis() - startTime;
+
+            if (cause instanceof TimeoutException) {
+                log.error("Processing timeout for trade: {}", trade.getTradeId());
+                metrics.recordTimeout(trade.getTradeType());
+                return ProcessingResult.timeout(trade.getTradeId());
+            }
+
+            log.error("Processing failed for trade: {}", trade.getTradeId(), cause);
+            metrics.recordProcessing(trade.getTradeType(), ProcessingStatus.PROCESSING_FAILED, duration);
             return ProcessingResult.failure(
                     trade.getTradeId(),
                     ProcessingStatus.PROCESSING_FAILED,
-                    e.getCause().getMessage()
+                    cause.getMessage()
             );
 
         } catch (Exception e) {
+            long duration = System.currentTimeMillis() - startTime;
             log.error("Unexpected error processing trade: {}", trade.getTradeId(), e);
+            metrics.recordProcessing(trade.getTradeType(), ProcessingStatus.PROCESSING_FAILED, duration);
             return ProcessingResult.failure(
                     trade.getTradeId(),
                     ProcessingStatus.PROCESSING_FAILED,
                     e.getMessage()
             );
+
+        } finally {
+            // Always decrement active count
+            metrics.decrementActiveProcessing();
         }
     }
 
-    /**
-     * Find processor that supports the given trade type.
-     */
     private TradeProcessor findProcessor(TradeType type) {
         return processors.stream()
                 .filter(p -> p.supports(type))

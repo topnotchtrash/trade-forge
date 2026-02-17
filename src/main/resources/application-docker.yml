@@ -1,0 +1,21 @@
+spring:
+  kafka:
+    bootstrap-servers: kafka:9092
+
+  datasource:
+    url: jdbc:postgresql://postgres:5432/trade_recon
+    username: admin
+    password: password
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+
+  sql:
+    init:
+      mode: always
+
+logging:
+  level:
+    root: INFO
+    com.traderecon.forge: INFO

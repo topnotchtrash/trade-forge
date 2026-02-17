@@ -1,0 +1,20 @@
+server:
+  port: 8090
+spring:
+  kafka:
+    bootstrap-servers: localhost:29092
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/trade_recon
+    username: admin
+    password: password
+
+# Enhanced logging for local development
+logging:
+  level:
+    root: INFO
+    com.traderecon.forge: DEBUG
+    org.springframework.kafka: INFO
+    org.apache.kafka: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE

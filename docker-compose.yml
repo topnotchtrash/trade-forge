@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  trade-forge-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trade-forge-1
+    ports:
+      - "8090:8090"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      DATABASE_URL: jdbc:postgresql://postgres:5432/trade_recon
+      DATABASE_USER: admin
+      DATABASE_PASSWORD: password
+    networks:
+      - trade-publisher_trade-recon-network
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  trade-forge-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trade-forge-2
+    ports:
+      - "8091:8090"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      DATABASE_URL: jdbc:postgresql://postgres:5432/trade_recon
+      DATABASE_USER: admin
+      DATABASE_PASSWORD: password
+    networks:
+      - trade-publisher_trade-recon-network
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  trade-forge-3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trade-forge-3
+    ports:
+      - "8092:8090"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      DATABASE_URL: jdbc:postgresql://postgres:5432/trade_recon
+      DATABASE_USER: admin
+      DATABASE_PASSWORD: password
+    networks:
+      - trade-publisher_trade-recon-network
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  trade-publisher_trade-recon-network:
+    external: true
